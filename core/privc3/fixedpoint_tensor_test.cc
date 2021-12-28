@@ -948,6 +948,121 @@ void test_fixedt_precision_recall_fixed(size_t p,
     Fix64N16::calc_precision_recall(tpfpfn, out);
 }
 
+void test_fixedt_calc_p_distance_fixed(size_t p,
+               std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in,
+               TensorAdapter<int64_t>* out) {
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> temp;
+    for (int i = 0; i < 4; i++) {
+        temp.emplace_back(gen(in[0]->shape()));
+    }
+
+    for (int i = 4; i < 6; ++i) {
+        temp.emplace_back(gen(out->shape()));
+    }
+    test_fixedt_gen_shares(p, in, temp);
+    Fix64N16* lhs = new Fix64N16(temp[0].get(), temp[1].get());
+    Fix64N16* rhs = new Fix64N16(temp[2].get(), temp[3].get());
+    Fix64N16* result = new Fix64N16(temp[4].get(), temp[5].get());
+    Fix64N16::calc_p_distance(lhs, rhs, in[2].get(), result);
+    result->reveal(out);
+}
+
+void test_fixedt_calc_multi_p_distance_fixed(size_t p,
+               std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in,
+               TensorAdapter<int64_t>* out) {
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> temp;
+    for (int i = 0; i < 4; i++) {
+        temp.emplace_back(gen(in[0]->shape()));
+    }
+
+    for (int i = 4; i < 6; ++i) {
+        temp.emplace_back(gen(out->shape()));
+    }
+    test_fixedt_gen_shares(p, in, temp);
+    Fix64N16* lhs = new Fix64N16(temp[0].get(), temp[1].get());
+    Fix64N16* rhs = new Fix64N16(temp[2].get(), temp[3].get());
+    Fix64N16* result = new Fix64N16(temp[4].get(), temp[5].get());
+    Fix64N16::calc_multi_p_distance(lhs, rhs, in[2].get(), result);
+    result->reveal(out);
+}
+
+void test_fixedt_align_nw_two_fixed(size_t p,
+               std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in,
+               TensorAdapter<int64_t>* out,
+               TensorAdapter<int64_t>* socre_bottom_right,
+               TensorAdapter<int64_t>* paths,
+               TensorAdapter<int64_t>* aligined) {
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> temp;
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> temp1;
+    for (int i = 0; i < 2; i++) {
+        temp.emplace_back(gen(in[0]->shape()));
+    }
+    for (int i = 2; i < 4; i++) {
+        temp1.emplace_back(gen(in[1]->shape()));
+    }
+
+    for (int i = 4; i < 8; ++i) {
+        temp.emplace_back(gen(out->shape()));
+    }
+    for (int i = 8; i < 10; ++i) {
+        temp.emplace_back(gen(socre_bottom_right->shape()));
+    }
+    std::vector<size_t> aligined_shape = aligined->shape();
+    aligined_shape.erase(aligined_shape.begin());
+    for (int i = 10; i < 14; ++i) {
+        temp.emplace_back(g_ctx_holder::tensor_factory()->template create<int64_t>());
+    }
+    for (int i = 14; i < 16 ; ++i) {
+        temp.emplace_back(gen(aligined_shape));
+    }
+
+    test_fixedt_gen_shares(p, in[0], temp);
+    test_fixedt_gen_shares(p, in[1], temp1);
+    Fix64N16* lhs = new Fix64N16(temp[0].get(), temp[1].get());
+    Fix64N16* rhs = new Fix64N16(temp1[0].get(), temp1[1].get());
+    Fix64N16* result = new Fix64N16(temp[2].get(), temp[3].get());
+    Fix64N16* result_path = new Fix64N16(temp[4].get(), temp[5].get());
+    Fix64N16* result_score = new Fix64N16(temp[6].get(), temp[7].get());
+    std::vector<std::shared_ptr<Fix64N16>> result_aligned;
+
+    result_aligned.emplace_back(new Fix64N16(temp[8].get(), temp[9].get()));
+    result_aligned.emplace_back(new Fix64N16(temp[10].get(), temp[11].get()));
+    std::vector<size_t> L;
+    Fix64N16::align_nw_two(lhs, rhs, result, result_score, result_path, result_aligned, L);
+
+    result->reveal(out);
+    result_path->reveal(paths);
+    result_score->reveal(socre_bottom_right);
+
+    result_aligned[0]->reveal(temp[12].get());
+    result_aligned[1]->reveal(temp[13].get());
+    temp[12]->copy(aligined->operator[](0).get());
+    temp[13]->copy(aligined->operator[](1).get());
+    
+}
+
+void test_fixedt_align_align_star_multiple_fixed(size_t p,
+               std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in,
+               TensorAdapter<int64_t>* out) {
+
+    std::vector<std::shared_ptr<Fix64N16>> seqs;
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> temp[6];
+    for(size_t i = 0; i < 5; ++i) {
+        temp[i].emplace_back(gen(in[i]->shape()));
+        temp[i].emplace_back(gen(in[i]->shape()));
+        test_fixedt_gen_shares(p, in[i], temp[i]);
+        seqs.emplace_back(new Fix64N16(temp[i][0].get(), temp[i][1].get()));
+    }
+
+    for (int i = 0; i < 2; i++) {
+        temp[5].emplace_back(gen(in[5]->shape()));
+    }
+    //test_fixedt_gen_shares(p, in[5], temp[5]);
+    Fix64N16* result = new Fix64N16(temp[5][0].get(), temp[5][1].get());
+    Fix64N16::align_star_multiple(seqs, result);
+    result->reveal(out);
+}
+
 TEST_F(FixedTensorTest, matmulfixed) {
 
     std::vector<size_t> shape = {1, 3};
@@ -3768,6 +3883,341 @@ TEST_F(FixedTensorTest, precision_recall) {
     EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), out1.get()));
     EXPECT_TRUE(test_fixedt_check_tensor_eq(out1.get(), out2.get()));
     EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), &result));
+}
+
+TEST_F(FixedTensorTest, calc_p_distance) {
+
+    std::vector<size_t> shape = {8};
+    std::vector<size_t> shape_miss = {3, 8};
+    std::vector<size_t> shape_o = {1};
+    std::vector<double> in0_val = {1, 5, 3, 1, 3, 1, 6, 5};
+    std::vector<double> in1_val = {1, 3, 3, 1, 3, 1, 3, 5};
+    std::vector<double> in2_val = {0, 0, 0, 0, 0, 0, 0, 0};
+    std::vector<double> in3_val = {4, 4, 4, 4, 4, 4, 4, 4};
+    std::vector<double> in4_val = {7, 7, 7, 7, 7, 7, 7, 7};
+
+    std::vector<double> res_val = {0.25};
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in =
+                     {gen(shape), gen(shape), gen(shape_miss)};
+    
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(in0_val,
+                                shape, _cpu_ctx).copy(in[0].get());
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(in1_val,
+                                shape, _cpu_ctx).copy(in[1].get());
+    
+    std::shared_ptr<TensorAdapter<int64_t>> temp = gen(shape);
+
+    in[2]->slice(0, 1, temp.get());
+
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(in2_val,
+                                shape, _cpu_ctx).copy(temp.get());
+
+    in[2]->slice(1, 2, temp.get());       
+
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(in3_val,
+                                shape, _cpu_ctx).copy(temp.get());
+
+    in[2]->slice(2, 3, temp.get());
+
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(in4_val,
+                                shape, _cpu_ctx).copy(temp.get());
+
+    dynamic_cast<PaddleTensor<int64_t>*>(in[2].get())->
+                                scaling_factor() = 16;
+
+    auto out0 = _s_tensor_factory->create<int64_t>(shape_o);
+    auto out1 = _s_tensor_factory->create<int64_t>(shape_o);
+    auto out2 = _s_tensor_factory->create<int64_t>(shape_o);
+    
+    PaddleTensor<int64_t> result =
+            test_fixedt_gen_paddle_tensor<int64_t, 16>(res_val, shape_o, _cpu_ctx);
+
+    _t[0] = std::thread([this, in, out0]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[0], [&](){
+            test_fixedt_calc_p_distance_fixed(0, in, out0.get());
+        });
+
+    });
+    _t[1] = std::thread([this, in, out1]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[1], [&](){
+            test_fixedt_calc_p_distance_fixed(1, in, out1.get());
+        });
+
+    });
+    _t[2] = std::thread([this, in, out2]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[2], [&](){
+            test_fixedt_calc_p_distance_fixed(2, in, out2.get());
+        });
+
+    });
+
+    _t[0].join();
+    _t[1].join();
+    _t[2].join();
+    
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), out1.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out1.get(), out2.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), &result));
+}
+
+TEST_F(FixedTensorTest, calc_multi_p_distance) {
+
+    std::vector<size_t> shape = {5, 8};
+    std::vector<size_t> shape_ = {8};
+    std::vector<size_t> shape_miss = {3, 6};
+    std::vector<size_t> shape_o = {5, 5};
+    std::vector<std::vector<double>> in0_val = { {1, 5, 3, 1, 3, 1, 6, 5},
+                                                 {1, 3, 3, 1, 3, 1, 3, 5},
+                                                 {6, 3, 3, 1, 3, 6, 3, 6},
+                                                 {1, 3, 3, 6, 3, 1, 3, 5},
+                                                 {1, 6, 3, 6, 5, 1, 6, 2}};
+    std::vector<double> in2_val = {0, 0, 0, 0, 0, 0, 0, 0};
+    std::vector<double> in3_val = {4, 4, 4, 4, 4, 4, 4, 4};
+    std::vector<double> in4_val = {7, 7, 7, 7, 7, 7, 7, 7};
+
+
+    std::vector<std::vector<double>> res_val = { {0., 0.25, 0.625, 0.375, 0.5},
+                                                 {0.25, 0., 0.375, 0.125, 0.625},
+                                                 {0.625, 0.375, 0., 0.5, 0.875},
+                                                 {0.375, 0.125, 0.5, 0., 0.5},
+                                                 {0.5, 0.625, 0.875, 0.5, 0.}};
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in =
+                     {gen(shape), gen(shape), gen(shape_miss)};
+    
+    for (size_t i = 0; i < shape[0]; ++i) {
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(in0_val[i],
+                                shape_, _cpu_ctx).copy(in[0]->operator[](i).get());
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(in0_val[i],
+                                shape_, _cpu_ctx).copy(in[1]->operator[](i).get());
+    }
+    
+    std::shared_ptr<TensorAdapter<int64_t>> temp = gen(shape_);
+    
+    in[2]->slice(0, 1, temp.get());
+    
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(in2_val,
+                                shape, _cpu_ctx).copy(temp.get());
+
+    in[2]->slice(1, 2, temp.get());       
+
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(in3_val,
+                                shape, _cpu_ctx).copy(temp.get());
+
+    in[2]->slice(2, 3, temp.get());
+
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(in4_val,
+                                shape, _cpu_ctx).copy(temp.get());
+
+    dynamic_cast<PaddleTensor<int64_t>*>(in[2].get())->
+                                scaling_factor() = 16;
+
+    auto out0 = _s_tensor_factory->create<int64_t>(shape_o);
+    auto out1 = _s_tensor_factory->create<int64_t>(shape_o);
+    auto out2 = _s_tensor_factory->create<int64_t>(shape_o);
+    
+    auto result = _s_tensor_factory->create<int64_t>(shape_o);
+    for (size_t i = 0; i < shape[0]; ++i) {
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(res_val[i],
+                                shape_, _cpu_ctx).copy(result->operator[](i).get());
+    }
+
+    _t[0] = std::thread([this, in, out0]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[0], [&](){
+            test_fixedt_calc_multi_p_distance_fixed(0, in, out0.get());
+        });
+
+    });
+    _t[1] = std::thread([this, in, out1]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[1], [&](){
+            test_fixedt_calc_multi_p_distance_fixed(1, in, out1.get());
+        });
+
+    });
+    _t[2] = std::thread([this, in, out2]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[2], [&](){
+            test_fixedt_calc_multi_p_distance_fixed(2, in, out2.get());
+        });
+
+    });
+
+    _t[0].join();
+    _t[1].join();
+    _t[2].join();
+    
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), out1.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out1.get(), out2.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), result.get()));
+    
+}
+
+TEST_F(FixedTensorTest, align_nw_two) {
+
+    std::vector<size_t> shape_1 = {7};
+    std::vector<size_t> shape_2 = {8};
+    std::vector<size_t> shape_one = {1};
+    std::vector<size_t> shape_o = {8, 9};
+    std::vector<size_t> shape_aligned = {2, 8};
+    std::vector<double> in1_val = {1, 5, 3, 1, 3, 1, 5};
+    std::vector<double> in2_val = {1, 3, 3, 1, 3, 1, 3, 5};
+    std::vector<std::vector<double>> aligned = { {1, 5, 3, 1, 3, 1, 6, 5},
+                                                 {1, 3, 3, 1, 3, 1, 3, 5}};
+
+    std::vector<std::vector<double>> res_val = { {0., -3., -6., -9., -12., -15., -18., -21., -24.},
+                                                 { -3., 2., -1., -4.,  -7., -10., -13., -16., -19.},
+                                                 { -6., -1., 1., -2.,  -5.,  -8., -11., -14., -14.},
+                                                 { -9., -4.,   1., 3.,   0.,  -3.,  -6.,  -9., -12.},
+                                                 {-12., -7.,  -2.,   0.,   5.,   2.,  -1.,  -4.,  -7.},
+                                                 {-15., -10.,  -5.,   0.,   2.,   7.,   4.,   1.,  -2.},
+                                                 {-18., -13.,  -8.,  -3.,   2.,   4.,   9.,   6.,   3.},
+                                                 {-21., -16., -11.,  -6.,  -1.,   1.,   6.,   8.,   8.}};
+    
+    std::vector<std::vector<double>> paths_val = { {0., 1., 1., 1., 1., 1., 1., 1., 1.},
+                                                   {3., 2., 1., 1., 2., 1., 2., 1., 1.},
+                                                   {3., 3., 2., 2., 2., 2., 2., 2., 2.},
+                                                   {3., 3., 2., 2., 1., 2., 1., 2., 1.},
+                                                   {3., 2., 3., 2., 2., 1., 2., 1., 1.},
+                                                   {3., 3., 2., 2., 3., 2., 1., 2., 1.},
+                                                   {3., 2., 3., 3., 2., 3., 2., 1., 1.},
+                                                   {3., 3., 3., 3., 3., 2., 3., 2., 2.}};
+    
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in =
+                     {gen(shape_1), gen(shape_2), gen(shape_o)};
+    
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(in1_val,
+                                shape_1, _cpu_ctx).copy(in[0].get());
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(in2_val,
+                                shape_2, _cpu_ctx).copy(in[1].get());
+
+    auto out0 = _s_tensor_factory->create<int64_t>(shape_o);
+    auto out1 = _s_tensor_factory->create<int64_t>(shape_o);
+    auto out2 = _s_tensor_factory->create<int64_t>(shape_o);
+
+    auto paths0 = _s_tensor_factory->create<int64_t>(shape_o);
+    auto paths1 = _s_tensor_factory->create<int64_t>(shape_o);
+    auto paths2 = _s_tensor_factory->create<int64_t>(shape_o);
+
+    auto score0 = _s_tensor_factory->create<int64_t>(shape_one);
+    auto score1 = _s_tensor_factory->create<int64_t>(shape_one);
+    auto score2 = _s_tensor_factory->create<int64_t>(shape_one);
+
+    auto aligned0 = _s_tensor_factory->create<int64_t>(shape_aligned);
+    auto aligned1 = _s_tensor_factory->create<int64_t>(shape_aligned);
+    auto aligned2 = _s_tensor_factory->create<int64_t>(shape_aligned);
+    
+    auto result = _s_tensor_factory->create<int64_t>(shape_o);
+    auto result_path = _s_tensor_factory->create<int64_t>(shape_o);
+    auto result_aligned = _s_tensor_factory->create<int64_t>(shape_aligned);
+    for (size_t i = 0; i < 8; ++i) {
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(res_val[i],
+                                shape_o, _cpu_ctx).copy(result->operator[](i).get());
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(paths_val[i],
+                                shape_o, _cpu_ctx).copy(result_path->operator[](i).get());      
+    }
+    for (size_t i = 0; i < 2; ++i) {
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(aligned[i],
+                                shape_o, _cpu_ctx).copy(result_aligned->operator[](i).get());      
+    }
+
+    _t[0] = std::thread([this, in, out0, score0, paths0, aligned0]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[0], [&](){
+            test_fixedt_align_nw_two_fixed(0, in, out0.get(), score0.get(), paths0.get(), aligned0.get());
+        });
+
+    });
+    _t[1] = std::thread([this, in, out1, score1, paths1, aligned1]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[1], [&](){
+            test_fixedt_align_nw_two_fixed(1, in, out1.get(), score1.get(), paths1.get(), aligned1.get());
+        });
+
+    });
+    _t[2] = std::thread([this, in, out2, score2, paths2, aligned2]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[2], [&](){
+            test_fixedt_align_nw_two_fixed(2, in, out2.get(), score2.get(), paths2.get(), aligned2.get());
+        });
+
+    });
+
+    _t[0].join();
+    _t[1].join();
+    _t[2].join();
+    
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), out1.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out1.get(), out2.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), result.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(paths0.get(), paths1.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(paths1.get(), paths2.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(paths0.get(), result_path.get()));
+    EXPECT_EQ((score0->data()[0] >> 16), 8);
+    EXPECT_EQ((score1->data()[0] >> 16), 8);
+    EXPECT_EQ((score2->data()[0] >> 16), 8);
+    
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(aligned0.get(), aligned1.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(aligned1.get(), aligned2.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(aligned0.get(), result_aligned.get()));
+
+}
+
+TEST_F(FixedTensorTest, align_star_multiple) {
+
+    std::vector<size_t> shape_one = {1};
+    std::vector<size_t> shape_o = {5, 8};
+    std::vector<size_t> shape_1 = {8};
+    std::vector<std::vector<size_t>> shape_in = {{7}, {8}, {5}, {7}, {5}};
+    std::vector<std::vector<double>> seqs = { {1, 5, 3, 1, 3, 1, 5},
+                                              {1, 3, 3, 1, 3, 1, 3, 5},
+                                              {3, 3, 1, 3, 3},
+                                              {1, 3, 3, 3, 1, 3, 5},
+                                              {1, 3, 5, 1, 2}};
+
+    std::vector<std::vector<double>> res_val = { {1, 5, 3, 1, 3, 1, 6, 5},
+                                                 {1, 3, 3, 1, 3, 1, 3, 5},
+                                                 {6, 3, 3, 1, 3, 6, 3, 6},
+                                                 {1, 3, 3, 6, 3, 1, 3, 5},
+                                                 {1, 6, 3, 6, 5, 1, 6, 2}};
+    
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in =
+                     {gen(shape_in[0]), gen(shape_in[1]), gen(shape_in[2]),
+                      gen(shape_in[3]), gen(shape_in[4]), gen(shape_o)};
+    auto result = _s_tensor_factory->create<int64_t>(shape_o);
+
+    for (size_t i = 0; i < 5; ++i) {
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(seqs[i],
+                                shape_in[i], _cpu_ctx).copy(in[i].get());
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(res_val[i],
+                                shape_1, _cpu_ctx).copy(result->operator[](i).get());
+    }
+
+    auto out0 = _s_tensor_factory->create<int64_t>(shape_o);
+    auto out1 = _s_tensor_factory->create<int64_t>(shape_o);
+    auto out2 = _s_tensor_factory->create<int64_t>(shape_o);
+
+    _t[0] = std::thread([this, in, out0]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[0], [&](){
+            test_fixedt_align_align_star_multiple_fixed(0, in, out0.get());
+        });
+
+    });
+    _t[1] = std::thread([this, in, out1]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[1], [&](){
+            test_fixedt_align_align_star_multiple_fixed(1, in, out1.get());
+        });
+
+    });
+    _t[2] = std::thread([this, in, out2]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[2], [&](){
+            test_fixedt_align_align_star_multiple_fixed(2, in, out2.get());
+        });
+
+    });
+
+    _t[0].join();
+    _t[1].join();
+    _t[2].join();
+    
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), out1.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out1.get(), out2.get()));
+    EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), result.get()));
+    
 }
 
 } // namespace aby3

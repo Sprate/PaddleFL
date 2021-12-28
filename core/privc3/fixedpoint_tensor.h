@@ -254,7 +254,27 @@ public:
 
     static void truncate(const FixedPointTensor* op, FixedPointTensor* ret,
                         size_t scaling_factor);
+    
+    static void calc_p_distance(const FixedPointTensor* lhs,
+                                const FixedPointTensor* rhs,
+                                const TensorAdapter<T>* miss,
+                                FixedPointTensor* ret);
+    static void calc_multi_p_distance(const FixedPointTensor* lhs,
+                                      const FixedPointTensor* rhs,
+                                      const TensorAdapter<T>* miss,
+                                      FixedPointTensor* ret);
 
+    static void align_nw_two(const FixedPointTensor* lhs,
+                             const FixedPointTensor* rhs,
+                             FixedPointTensor* ret,
+                             FixedPointTensor* score_bottom_right,
+                             FixedPointTensor* paths,
+                             std::vector<std::shared_ptr<FixedPointTensor<T, N>>> &aligned,
+                             std::vector<size_t> &l);
+
+    static void align_star_multiple(std::vector<std::shared_ptr<FixedPointTensor<T, N>>> &seqs,
+                                    FixedPointTensor* ret);
+    
 private:
     static inline std::shared_ptr<AbstractContext> aby3_ctx() {
       return paddle::mpc::ContextHolder::mpc_ctx();
