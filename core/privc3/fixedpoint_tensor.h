@@ -260,7 +260,6 @@ public:
                                 const TensorAdapter<T>* miss,
                                 FixedPointTensor* ret);
     static void calc_multi_p_distance(const FixedPointTensor* lhs,
-                                      const FixedPointTensor* rhs,
                                       const TensorAdapter<T>* miss,
                                       FixedPointTensor* ret);
 
@@ -274,6 +273,9 @@ public:
 
     static void align_star_multiple(std::vector<std::shared_ptr<FixedPointTensor<T, N>>> &seqs,
                                     FixedPointTensor* ret);
+    
+    static void nj(FixedPointTensor* dm, std::vector<std::string> &ids,
+                   std::string & tree);
     
 private:
     static inline std::shared_ptr<AbstractContext> aby3_ctx() {

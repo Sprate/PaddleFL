@@ -971,18 +971,17 @@ void test_fixedt_calc_multi_p_distance_fixed(size_t p,
                std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in,
                TensorAdapter<int64_t>* out) {
     std::vector<std::shared_ptr<TensorAdapter<int64_t>>> temp;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 2; i++) {
         temp.emplace_back(gen(in[0]->shape()));
     }
 
-    for (int i = 4; i < 6; ++i) {
+    for (int i = 2; i < 4; ++i) {
         temp.emplace_back(gen(out->shape()));
     }
-    test_fixedt_gen_shares(p, in, temp);
+    test_fixedt_gen_shares(p, in[0], temp);
     Fix64N16* lhs = new Fix64N16(temp[0].get(), temp[1].get());
-    Fix64N16* rhs = new Fix64N16(temp[2].get(), temp[3].get());
-    Fix64N16* result = new Fix64N16(temp[4].get(), temp[5].get());
-    Fix64N16::calc_multi_p_distance(lhs, rhs, in[2].get(), result);
+    Fix64N16* result = new Fix64N16(temp[2].get(), temp[3].get());
+    Fix64N16::calc_multi_p_distance(lhs, in[1].get(), result);
     result->reveal(out);
 }
 
@@ -1057,10 +1056,22 @@ void test_fixedt_align_align_star_multiple_fixed(size_t p,
     for (int i = 0; i < 2; i++) {
         temp[5].emplace_back(gen(in[5]->shape()));
     }
-    //test_fixedt_gen_shares(p, in[5], temp[5]);
     Fix64N16* result = new Fix64N16(temp[5][0].get(), temp[5][1].get());
     Fix64N16::align_star_multiple(seqs, result);
     result->reveal(out);
+}
+
+void test_fixedt_nj_fixed(size_t p,
+               std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in,
+               std::vector<std::string> &ids,
+               std::string &tree) {
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> temp;
+    for (int i = 0; i < 2; i++) {
+        temp.emplace_back(gen(in[0]->shape()));
+    }
+    test_fixedt_gen_shares(p, in[0], temp);
+    Fix64N16* lhs = new Fix64N16(temp[0].get(), temp[1].get());
+    Fix64N16::nj(lhs, ids, tree);
 }
 
 TEST_F(FixedTensorTest, matmulfixed) {
@@ -3892,9 +3903,9 @@ TEST_F(FixedTensorTest, calc_p_distance) {
     std::vector<size_t> shape_o = {1};
     std::vector<double> in0_val = {1, 5, 3, 1, 3, 1, 6, 5};
     std::vector<double> in1_val = {1, 3, 3, 1, 3, 1, 3, 5};
-    std::vector<double> in2_val = {0, 0, 0, 0, 0, 0, 0, 0};
-    std::vector<double> in3_val = {4, 4, 4, 4, 4, 4, 4, 4};
-    std::vector<double> in4_val = {7, 7, 7, 7, 7, 7, 7, 7};
+    std::vector<std::vector<double>> miss = { {0, 0, 0, 0, 0, 0, 0, 0}, 
+                                              {4, 4, 4, 4, 4, 4, 4, 4},
+                                              {7, 7, 7, 7, 7, 7, 7, 7} };
 
     std::vector<double> res_val = {0.25};
     std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in =
@@ -3906,21 +3917,12 @@ TEST_F(FixedTensorTest, calc_p_distance) {
                                 shape, _cpu_ctx).copy(in[1].get());
     
     std::shared_ptr<TensorAdapter<int64_t>> temp = gen(shape);
-
-    in[2]->slice(0, 1, temp.get());
-
-    test_fixedt_gen_paddle_tensor<int64_t, 16>(in2_val,
+    
+    for (size_t i = 0; i < 3; ++i) {
+        in[2]->slice(i, i + 1, temp.get());
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(miss[i],
                                 shape, _cpu_ctx).copy(temp.get());
-
-    in[2]->slice(1, 2, temp.get());       
-
-    test_fixedt_gen_paddle_tensor<int64_t, 16>(in3_val,
-                                shape, _cpu_ctx).copy(temp.get());
-
-    in[2]->slice(2, 3, temp.get());
-
-    test_fixedt_gen_paddle_tensor<int64_t, 16>(in4_val,
-                                shape, _cpu_ctx).copy(temp.get());
+    }
 
     dynamic_cast<PaddleTensor<int64_t>*>(in[2].get())->
                                 scaling_factor() = 16;
@@ -3971,10 +3973,9 @@ TEST_F(FixedTensorTest, calc_multi_p_distance) {
                                                  {6, 3, 3, 1, 3, 6, 3, 6},
                                                  {1, 3, 3, 6, 3, 1, 3, 5},
                                                  {1, 6, 3, 6, 5, 1, 6, 2}};
-    std::vector<double> in2_val = {0, 0, 0, 0, 0, 0, 0, 0};
-    std::vector<double> in3_val = {4, 4, 4, 4, 4, 4, 4, 4};
-    std::vector<double> in4_val = {7, 7, 7, 7, 7, 7, 7, 7};
-
+    std::vector<std::vector<double>> miss = { {0, 0, 0, 0, 0, 0, 0, 0}, 
+                                              {4, 4, 4, 4, 4, 4, 4, 4},
+                                              {7, 7, 7, 7, 7, 7, 7, 7} };
 
     std::vector<std::vector<double>> res_val = { {0., 0.25, 0.625, 0.375, 0.5},
                                                  {0.25, 0., 0.375, 0.125, 0.625},
@@ -3982,33 +3983,22 @@ TEST_F(FixedTensorTest, calc_multi_p_distance) {
                                                  {0.375, 0.125, 0.5, 0., 0.5},
                                                  {0.5, 0.625, 0.875, 0.5, 0.}};
     std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in =
-                     {gen(shape), gen(shape), gen(shape_miss)};
+                     {gen(shape), gen(shape_miss)};
     
     for (size_t i = 0; i < shape[0]; ++i) {
         test_fixedt_gen_paddle_tensor<int64_t, 16>(in0_val[i],
                                 shape_, _cpu_ctx).copy(in[0]->operator[](i).get());
-        test_fixedt_gen_paddle_tensor<int64_t, 16>(in0_val[i],
-                                shape_, _cpu_ctx).copy(in[1]->operator[](i).get());
     }
     
     std::shared_ptr<TensorAdapter<int64_t>> temp = gen(shape_);
-    
-    in[2]->slice(0, 1, temp.get());
-    
-    test_fixedt_gen_paddle_tensor<int64_t, 16>(in2_val,
+
+    for (size_t i = 0; i < 3; ++i) {
+        in[1]->slice(i, i + 1, temp.get());
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(miss[i],
                                 shape, _cpu_ctx).copy(temp.get());
+    }
 
-    in[2]->slice(1, 2, temp.get());       
-
-    test_fixedt_gen_paddle_tensor<int64_t, 16>(in3_val,
-                                shape, _cpu_ctx).copy(temp.get());
-
-    in[2]->slice(2, 3, temp.get());
-
-    test_fixedt_gen_paddle_tensor<int64_t, 16>(in4_val,
-                                shape, _cpu_ctx).copy(temp.get());
-
-    dynamic_cast<PaddleTensor<int64_t>*>(in[2].get())->
+    dynamic_cast<PaddleTensor<int64_t>*>(in[1].get())->
                                 scaling_factor() = 16;
 
     auto out0 = _s_tensor_factory->create<int64_t>(shape_o);
@@ -4218,6 +4208,55 @@ TEST_F(FixedTensorTest, align_star_multiple) {
     EXPECT_TRUE(test_fixedt_check_tensor_eq(out1.get(), out2.get()));
     EXPECT_TRUE(test_fixedt_check_tensor_eq(out0.get(), result.get()));
     
+}
+
+TEST_F(FixedTensorTest, nj) {
+
+    std::vector<size_t> shape = {5, 5};
+    std::vector<size_t> shape_ = {5};
+    std::vector<std::vector<double>> in_val =  { {0., 0.25, 0.625, 0.375, 0.5},
+                                                 {0.25, 0., 0.375, 0.125, 0.625},
+                                                 {0.625, 0.375, 0., 0.5, 0.875},
+                                                 {0.375, 0.125, 0.5, 0., 0.5},
+                                                 {0.5, 0.625, 0.875, 0.5, 0.}};
+    std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in =
+                     {gen(shape)};
+    
+    for (size_t i = 0; i < shape[0]; ++i) {
+        test_fixedt_gen_paddle_tensor<int64_t, 16>(in_val[i],
+                                shape_, _cpu_ctx).copy(in[0]->operator[](i).get());
+    }
+    std::vector<std::string> ids = {"a" , "b", "c" , "d", "e"};
+    std::string expect_tree = "((e, a), (c, b), d)";
+    std::string tree0 = "";
+    std::string tree1 = "";
+    std::string tree2 = "";
+    
+    _t[0] = std::thread([this, in, ids, &tree0]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[0], [&](){
+            test_fixedt_nj_fixed(0, in, ids, tree0);
+        });
+
+    });
+    _t[1] = std::thread([this, in, ids, &tree1]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[1], [&](){
+            test_fixedt_nj_fixed(1, in, ids, tree1);
+        });
+
+    });
+    _t[2] = std::thread([this, in, ids, &tree2]() mutable {
+        g_ctx_holder::template run_with_context(_exec_ctx.get(), _mpc_ctx[2], [&](){
+            test_fixedt_nj_fixed(2, in, ids, tree2);
+        });
+    });
+
+    _t[0].join();
+    _t[1].join();
+    _t[2].join();
+    
+    EXPECT_EQ(tree0, tree1);
+    EXPECT_EQ(tree1, tree2);
+    EXPECT_EQ(tree0, expect_tree);
 }
 
 } // namespace aby3
