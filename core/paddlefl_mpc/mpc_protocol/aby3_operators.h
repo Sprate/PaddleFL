@@ -116,6 +116,11 @@ public:
     void reveal(const Tensor *in, Tensor* out) override;
 
     void argmax(const Tensor *op, Tensor *out) override;
+
+    void calc_multi_p_distance(const Tensor *lhs, const Tensor *rhs, const Tensor *miss, Tensor *out);
+
+    void align_star(const Tensor* seqs, const Tensor* lod, Tensor *out);
+
 private:
 
     typedef void(FixedTensor:: * sigmoid_func)(FixedTensor *fixed_tensor);

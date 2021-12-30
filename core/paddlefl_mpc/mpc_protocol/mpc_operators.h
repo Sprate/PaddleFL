@@ -168,6 +168,10 @@ public:
     virtual void online_share(size_t party, const Tensor *input, Tensor *out) = 0;
 
     virtual void argmax(const Tensor *op, Tensor *out) = 0;
+
+    virtual void calc_multi_p_distance(const Tensor *lhs, const Tensor *rhs, const Tensor *miss, Tensor *out) {};
+
+    virtual void align_star(const Tensor* seqs, const Tensor* lod, Tensor *out) {};
 };
 
 } // mpc

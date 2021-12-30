@@ -23,6 +23,7 @@ limitations under the License. */
 
 #include "context_holder.h"
 #include "paddle/fluid/framework/tensor.h"
+#include "paddle/fluid/framework/ddim.h"
 #include "core/privc3/boolean_tensor.h"
 #include "core/privc3/aby3_context.h"
 #include "core/privc3/fixedpoint_tensor.h"
@@ -583,6 +584,62 @@ void Aby3OperatorsImpl::online_share(size_t party,
         auto out_ = std::get<0>(out_tuple).get();
 
         FixedTensor::online_share(party, &input_, out_);
+}
+
+void Aby3OperatorsImpl::calc_multi_p_distance(
+        const Tensor *lhs,
+        const Tensor *rhs,
+        const Tensor *miss,
+        Tensor *out) {
+    auto lhs_tuple = from_tensor(lhs);
+    auto rhs_tuple = from_tensor(rhs);
+    PaddleTensor miss_(ContextHolder::device_ctx(), *miss);
+    auto out_tuple = from_tensor(out);
+
+    auto lhs_ = std::get<0>(lhs_tuple).get();
+    auto rhs_ = std::get<0>(rhs_tuple).get();
+    auto out_ = std::get<0>(out_tuple).get();
+
+    FixedTensor::calc_multi_p_distance(lhs_, rhs_, &miss_, out_);
+}
+
+void Aby3OperatorsImpl::align_star(const Tensor* seqs, const Tensor* lod, Tensor *out) {
+    size_t size = lod->numel();
+    
+    const int64_t* lod_data = lod->data<int64_t>();
+
+    size_t total = std::accumulate(lod_data, lod_data + size, (int64_t) 0);
+
+    std::vector<std::shared_ptr<FixedTensor>> seqs_vec;
+    std::vector<std::shared_ptr<PaddleTensor>> p0s;
+    std::vector<std::shared_ptr<PaddleTensor>> p1s;
+
+    auto seqs_share0 = seqs->Slice(0, 1);
+    auto seqs_share1 = seqs->Slice(1, 2);
+
+    seqs_share0.Resize(paddle::framework::DDim({total}));
+    seqs_share1.Resize(paddle::framework::DDim({total}));
+
+    int64_t begin = 0;
+    for (int i = 0; i < size; ++i) {
+        size_t seq_len = lod_data[i];
+        auto seq_share0 = seqs_share0.Slice(begin, begin + seq_len);
+        auto seq_share1 = seqs_share1.Slice(begin, begin + seq_len);
+
+        seq_share0.Resize(paddle::framework::DDim({seq_len}));
+        seq_share1.Resize(paddle::framework::DDim({seq_len}));
+
+        p0s.emplace_back(std::make_shared<PaddleTensor>(ContextHolder::device_ctx(), seq_share0));
+        p1s.emplace_back(std::make_shared<PaddleTensor>(ContextHolder::device_ctx(), seq_share1));
+        seqs_vec.emplace_back(std::make_shared<FixedTensor>(p0s.back().get(), p1s.back().get()));
+        begin += seq_len;
+    }
+
+    auto out_tuple = from_tensor(out);
+
+    auto out_ = std::get<0>(out_tuple).get();
+
+    FixedTensor::align_star_multiple(seqs_vec, out_);
 }
 
 } // mpc

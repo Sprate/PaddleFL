@@ -27,7 +27,9 @@ __all__ = [
     'sum',
     'square_error_cost',
     'reduce_sum',
-    'scale'
+    'scale',
+    'p_distance',
+    'align_star'
 ]
 
 
@@ -246,3 +248,36 @@ def scale(x, scale=1.0, bias=0.0, bias_after_scale=True, act=None, name=None):
         type='mpc_scale', inputs=inputs, outputs={'Out': out}, attrs=attrs)
     return helper.append_activation(out)
 
+
+def p_distance(x, y, miss):
+    """R
+    
+    """
+    check_mpc_variable_and_dtype(x, "x", ['int64'], "p_distance")
+    helper = MpcLayerHelper('p_distance', **locals())
+    out = helper.create_mpc_variable_for_type_inference(dtype=x.dtype)
+    helper.append_op(
+        type='mpc_p_distance',
+        inputs={'X': [x],
+                'Y': [y],
+                "Miss": [miss]},
+        outputs={'Out': [out]})
+
+    return out
+
+
+def align_star(x, lod):
+    """R
+    
+    """
+    check_mpc_variable_and_dtype(x, "x", ['int64'], "align_star")
+    check_mpc_variable_and_dtype(lod, "lod", ['int64'], "align_star")
+    helper = MpcLayerHelper('align_star', **locals())
+    out = helper.create_mpc_variable_for_type_inference(dtype=x.dtype)
+    helper.append_op(
+        type='mpc_align_star',
+        inputs={'X': [x],
+                'Lod': [lod]},
+        outputs={'Out': [out]})
+
+    return out
