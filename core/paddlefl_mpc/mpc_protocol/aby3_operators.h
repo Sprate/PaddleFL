@@ -117,7 +117,7 @@ public:
 
     void argmax(const Tensor *op, Tensor *out) override;
 
-    void calc_multi_p_distance(const Tensor *lhs, const Tensor *rhs, const Tensor *miss, Tensor *out);
+    void calc_multi_p_distance(const Tensor *lhs, const Tensor *miss, Tensor *out);
 
     void align_star(const Tensor* seqs, const Tensor* lod, Tensor *out);
 

@@ -259,6 +259,7 @@ public:
                                 const FixedPointTensor* rhs,
                                 const TensorAdapter<T>* miss,
                                 FixedPointTensor* ret);
+                                
     static void calc_multi_p_distance(const FixedPointTensor* lhs,
                                       const TensorAdapter<T>* miss,
                                       FixedPointTensor* ret);

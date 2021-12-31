@@ -249,7 +249,7 @@ def scale(x, scale=1.0, bias=0.0, bias_after_scale=True, act=None, name=None):
     return helper.append_activation(out)
 
 
-def p_distance(x, y, miss):
+def p_distance(x, miss):
     """R
     
     """
@@ -259,7 +259,6 @@ def p_distance(x, y, miss):
     helper.append_op(
         type='mpc_p_distance',
         inputs={'X': [x],
-                'Y': [y],
                 "Miss": [miss]},
         outputs={'Out': [out]})
 

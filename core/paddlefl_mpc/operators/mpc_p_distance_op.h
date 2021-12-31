@@ -25,14 +25,13 @@ class MpcPDistanceKernel : public MpcOpKernel<T> {
 public:
     void ComputeImpl(const framework::ExecutionContext &ctx) const override {
         auto *x = ctx.Input<Tensor>("X");
-        auto *y = ctx.Input<Tensor>("Y");
         auto *miss = ctx.Input<Tensor>("Miss");
         auto *out = ctx.Output<Tensor>("Out");
 
         out->mutable_data<T>(ctx.GetPlace());
 
         mpc::MpcInstance::mpc_instance()->mpc_protocol()->mpc_operators()->calc_multi_p_distance(
-            x, y, miss, out); 
+            x, miss, out);
     }
 };
 

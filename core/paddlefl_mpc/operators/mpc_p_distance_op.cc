@@ -29,9 +29,6 @@ public:
             ctx->HasInput("X"), true,
             platform::errors::NotFound("Input(X) of Mpc PDistance should not be null."));
         PADDLE_ENFORCE_EQ(
-            ctx->HasInput("Y"), true,
-            platform::errors::NotFound("Input(Y) of MpcPDistance should not be null."));
-        PADDLE_ENFORCE_EQ(
             ctx->HasInput("Miss"), true,
             platform::errors::NotFound("Input(Miss) of MpcPDistance should not be null."));
         PADDLE_ENFORCE_EQ(
@@ -39,32 +36,25 @@ public:
             platform::errors::NotFound("Output(Out) of MpcPDistance should not be null."));
 
         auto x_dims = ctx->GetInputDim("X");
-        auto y_dims = ctx->GetInputDim("Y");
+        auto miss_dims = ctx->GetInputDim("Miss");
 
-        VLOG(3) << "mpc pdistance operator x.shape=" << x_dims << " y.shape=" << y_dims;
-        
+        VLOG(3) << "mpc pdistance operator x.shape=" << x_dims ;
+        /*
         PADDLE_ENFORCE_EQ(
-            x_dims.size(), y_dims.size(),
+            x_dims.size(), miss_dims.size(),
             platform::errors::InvalidArgument(
                 "The input tensor X's dimensions of MpcPDistance "
                 "should be equal to Y's dimensions. But received X's "
                 "dimensions = %d, Y's dimensions = %d",
-                x_dims.size(), y_dims.size()));
+                x_dims.size(), miss_dims.size()));
 
-        PADDLE_ENFORCE_EQ(x_dims[1], y_dims[1],
+        PADDLE_ENFORCE_EQ(x_dims[1], miss_dims[1],
                           platform::errors::InvalidArgument(
                         "The input tensor X's shape of MpcPDistance "
                         "should be equal to Y's shape. But received X's "
                         "shape = [%s], Y's shape = [%s]",
-                        x_dims, y_dims));
-
-        PADDLE_ENFORCE_EQ(x_dims[0], y_dims[0],
-                          platform::errors::InvalidArgument(
-                        "The input tensor X's shape of MpcPDistance "
-                        "should be equal to Y's shape. But received X's "
-                        "shape = [%s], Y's shape = [%s]",
-                        x_dims, y_dims));
-        
+                        x_dims, miss_dims));
+        */
         std::vector<int64_t> output_dims{2, x_dims[1], x_dims[1]};
 
         ctx->SetOutputDim("Out", framework::make_ddim(output_dims));
@@ -76,7 +66,6 @@ class MpcPDistanceMaker : public framework::OpProtoAndCheckerMaker {
 public:
     void Make() override {
         AddInput("X", "(Tensor), The first input tensor of mpc PDistance op.");
-        AddInput("Y", "(Tensor), The second input tensor of mpc PDistance op.");
         AddInput("Miss", "(Tensor), The third input tensor of mpc PDistance op.");
         AddOutput("Out", "(Tensor), The output tensor of mpc PDistance op.");
         
