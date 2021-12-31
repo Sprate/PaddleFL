@@ -39,27 +39,19 @@ public:
         auto miss_dims = ctx->GetInputDim("Miss");
 
         VLOG(3) << "mpc pdistance operator x.shape=" << x_dims ;
-        /*
-        PADDLE_ENFORCE_EQ(
-            x_dims.size(), miss_dims.size(),
-            platform::errors::InvalidArgument(
-                "The input tensor X's dimensions of MpcPDistance "
-                "should be equal to Y's dimensions. But received X's "
-                "dimensions = %d, Y's dimensions = %d",
-                x_dims.size(), miss_dims.size()));
 
-        PADDLE_ENFORCE_EQ(x_dims[1], miss_dims[1],
-                          platform::errors::InvalidArgument(
-                        "The input tensor X's shape of MpcPDistance "
-                        "should be equal to Y's shape. But received X's "
-                        "shape = [%s], Y's shape = [%s]",
-                        x_dims, miss_dims));
-        */
         std::vector<int64_t> output_dims{2, x_dims[1], x_dims[1]};
 
         ctx->SetOutputDim("Out", framework::make_ddim(output_dims));
         ctx->ShareLoD("X", /*->*/ "Out");
     }
+
+    framework::OpKernelType GetExpectedKernelType(
+        const framework::ExecutionContext& ctx) const override {
+            return framework::OpKernelType(
+                OperatorWithKernel::IndicateVarDataType(ctx, "X"), ctx.GetPlace());
+    }
+                
 };
 
 class MpcPDistanceMaker : public framework::OpProtoAndCheckerMaker {

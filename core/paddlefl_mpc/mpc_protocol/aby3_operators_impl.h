@@ -602,6 +602,7 @@ void Aby3OperatorsImpl::calc_multi_p_distance(
 }
 
 void Aby3OperatorsImpl::align_star(const Tensor* seqs, const Tensor* lod, Tensor *out) {
+    
     size_t size = lod->numel();
     
     const int64_t* lod_data = lod->data<int64_t>();
@@ -615,8 +616,9 @@ void Aby3OperatorsImpl::align_star(const Tensor* seqs, const Tensor* lod, Tensor
     auto seqs_share0 = seqs->Slice(0, 1);
     auto seqs_share1 = seqs->Slice(1, 2);
 
-    seqs_share0.Resize(paddle::framework::DDim({total}));
-    seqs_share1.Resize(paddle::framework::DDim({total}));
+    std::vector<int64_t> shape_total = {int64_t(total), 1};
+    seqs_share0.Resize(paddle::framework::DDim(shape_total.data(), shape_total.size()));
+    seqs_share1.Resize(paddle::framework::DDim(shape_total.data(), shape_total.size()));
 
     int64_t begin = 0;
     for (int i = 0; i < size; ++i) {
@@ -624,20 +626,28 @@ void Aby3OperatorsImpl::align_star(const Tensor* seqs, const Tensor* lod, Tensor
         auto seq_share0 = seqs_share0.Slice(begin, begin + seq_len);
         auto seq_share1 = seqs_share1.Slice(begin, begin + seq_len);
 
-        seq_share0.Resize(paddle::framework::DDim({seq_len}));
-        seq_share1.Resize(paddle::framework::DDim({seq_len}));
+        seq_share0.Resize(paddle::framework::DDim({int64_t(seq_len)}));
+        seq_share1.Resize(paddle::framework::DDim({int64_t(seq_len)}));
 
         p0s.emplace_back(std::make_shared<PaddleTensor>(ContextHolder::device_ctx(), seq_share0));
         p1s.emplace_back(std::make_shared<PaddleTensor>(ContextHolder::device_ctx(), seq_share1));
         seqs_vec.emplace_back(std::make_shared<FixedTensor>(p0s.back().get(), p1s.back().get()));
         begin += seq_len;
     }
+    
+    auto tmp0 = ContextHolder::tensor_factory()->create_int64_t();
+    auto tmp1 = ContextHolder::tensor_factory()->create_int64_t();
+    FixedTensor out_ (tmp0.get(), tmp1.get());
+  
+    FixedTensor::align_star_multiple(seqs_vec, &out_);
+    
+    out->Resize(paddle::framework::make_ddim({2, (int64_t)size, int64_t(out_.shape()[1])}));
+    
+    std::copy(out_.share(0)->data(), out_.share(0)->data() + out_.share(0)->numel(),
+              out->data<int64_t>());
+    std::copy(out_.share(1)->data(), out_.share(1)->data() + out_.share(1)->numel(),
+              out->data<int64_t>() + out_.share(0)->numel());
 
-    auto out_tuple = from_tensor(out);
-
-    auto out_ = std::get<0>(out_tuple).get();
-
-    FixedTensor::align_star_multiple(seqs_vec, out_);
 }
 
 } // mpc

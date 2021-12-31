@@ -2104,6 +2104,25 @@ void FixedPointTensor<T, N>::align_nw_two(const FixedPointTensor* lhs,
 template<typename T, size_t N>
 void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<FixedPointTensor<T, N>>> &seqs,
                                                  FixedPointTensor* ret) {
+    
+    
+    std::vector<std::shared_ptr<FixedPointTensor<T, N>>> mutable_seqs;
+    std::vector<std::shared_ptr<TensorAdapter<T>>> seqs_temp;
+
+    for (size_t i = 0; i < seqs.size(); ++i) {
+        seqs_temp.emplace_back(
+            tensor_factory()->template create<T>(seqs[i]->shape()));
+        seqs_temp.emplace_back(
+            tensor_factory()->template create<T>(seqs[i]->shape()));
+    }
+
+    for (size_t i = 0; i < seqs.size(); ++i) {
+
+        seqs[i]->share(0)->copy(seqs_temp[2 * i].get());
+        seqs[i]->share(1)->copy(seqs_temp[2 * i + 1].get());
+        mutable_seqs.emplace_back(
+            new FixedPointTensor<T, N>(seqs_temp[2 * i].get(), seqs_temp[2 * i + 1].get())); 
+    }
 
     std::vector<size_t> shape_one = {1};
     std::vector<std::pair<size_t, size_t>> pairs;
@@ -2139,8 +2158,8 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
         size_t rhs_idx = pairs[i].second;
         std::vector<std::shared_ptr<TensorAdapter<T>>> ret_path;
         
-        std::vector<size_t> shape_ret_path = {seqs[lhs_idx]->shape()[0] + 1,
-                                              seqs[rhs_idx]->shape()[0] + 1};
+        std::vector<size_t> shape_ret_path = {mutable_seqs[lhs_idx]->shape()[0] + 1,
+                                              mutable_seqs[rhs_idx]->shape()[0] + 1};
         for (size_t iter = 0; iter < 4; ++iter) {
             ret_path.emplace_back(
                 tensor_factory()->template create<T>(shape_ret_path));
@@ -2150,7 +2169,7 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
         FixedPointTensor<T, N> paths(ret_path[2].get(), ret_path[3].get());
         std::vector<size_t> l;
         
-        align_nw_two(seqs[lhs_idx].get(), seqs[rhs_idx].get(), &score_matrix, &score_bottom_right,
+        align_nw_two(mutable_seqs[lhs_idx].get(), mutable_seqs[rhs_idx].get(), &score_matrix, &score_bottom_right,
                      &paths, aligned, l);
         scores2a2.mutable_share(0)->data()[i] = score_bottom_right.share(0)->data()[0];
         scores2a2.mutable_share(1)->data()[i] = score_bottom_right.share(1)->data()[0];
@@ -2204,11 +2223,11 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
         }
     }
     
-    temp[16]->reshape(seqs[max_idx]->shape());
-    temp[17]->reshape(seqs[max_idx]->shape());
+    temp[16]->reshape(mutable_seqs[max_idx]->shape());
+    temp[17]->reshape(mutable_seqs[max_idx]->shape());
     FixedPointTensor<T, N> pivot(temp[16].get(), temp[17].get());
-    seqs[max_idx]->share(0)->copy(pivot.mutable_share(0));
-    seqs[max_idx]->share(1)->copy(pivot.mutable_share(1));
+    mutable_seqs[max_idx]->share(0)->copy(pivot.mutable_share(0));
+    mutable_seqs[max_idx]->share(1)->copy(pivot.mutable_share(1));
 
     FixedPointTensor<T, N> gap(temp[18].get(), temp[19].get());
     score_bottom_right.mutable_share(0)->reshape(shape_one);
@@ -2222,7 +2241,7 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
 
     for (size_t i = 0; i < seqs_len; ++i) {
         std::vector<std::shared_ptr<TensorAdapter<T>>> ret_path;
-        std::vector<size_t> shape_ret_path = {seqs[i]->shape()[0] + 1,
+        std::vector<size_t> shape_ret_path = {mutable_seqs[i]->shape()[0] + 1,
                                             pivot.shape()[0] + 1};
         for (size_t iter = 0; iter < 4; ++iter) {
             ret_path.emplace_back(
@@ -2231,32 +2250,32 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
         FixedPointTensor<T, N> score_matrix(ret_path[0].get(), ret_path[1].get());
         FixedPointTensor<T, N> paths(ret_path[2].get(), ret_path[3].get());
         std::vector<size_t> l;
-        align_nw_two(seqs[i].get(), &pivot, &score_matrix, &score_bottom_right,
+        align_nw_two(mutable_seqs[i].get(), &pivot, &score_matrix, &score_bottom_right,
                     &paths, aligned, l);
-        seqs[i]->mutable_share(0)->reshape(aligned[0]->shape());
-        aligned[0]->share(0)->copy(seqs[i]->mutable_share(0));
-        seqs[i]->mutable_share(1)->reshape(aligned[0]->shape());
-        aligned[0]->share(1)->copy(seqs[i]->mutable_share(1));
+        mutable_seqs[i]->mutable_share(0)->reshape(aligned[0]->shape());
+        aligned[0]->share(0)->copy(mutable_seqs[i]->mutable_share(0));
+        mutable_seqs[i]->mutable_share(1)->reshape(aligned[0]->shape());
+        aligned[0]->share(1)->copy(mutable_seqs[i]->mutable_share(1));
         if (!l.empty()) {
-            seqs[max_idx]->mutable_share(0)->reshape(aligned[1]->shape());
-            aligned[1]->share(0)->copy(seqs[max_idx]->mutable_share(0));
-            seqs[max_idx]->mutable_share(1)->reshape(aligned[1]->shape());
-            aligned[1]->share(1)->copy(seqs[max_idx]->mutable_share(1));
-            pivot.mutable_share(0)->reshape(seqs[max_idx]->shape());
-            pivot.mutable_share(1)->reshape(seqs[max_idx]->shape());
-            seqs[max_idx]->share(0)->copy(pivot.mutable_share(0));
-            seqs[max_idx]->share(1)->copy(pivot.mutable_share(1));
+            mutable_seqs[max_idx]->mutable_share(0)->reshape(aligned[1]->shape());
+            aligned[1]->share(0)->copy(mutable_seqs[max_idx]->mutable_share(0));
+            mutable_seqs[max_idx]->mutable_share(1)->reshape(aligned[1]->shape());
+            aligned[1]->share(1)->copy(mutable_seqs[max_idx]->mutable_share(1));
+            pivot.mutable_share(0)->reshape(mutable_seqs[max_idx]->shape());
+            pivot.mutable_share(1)->reshape(mutable_seqs[max_idx]->shape());
+            mutable_seqs[max_idx]->share(0)->copy(pivot.mutable_share(0));
+            mutable_seqs[max_idx]->share(1)->copy(pivot.mutable_share(1));
             for(size_t j = 0; j < i; ++i) {
                 if (j != max_idx) {
                     gap.mutable_share(0)->reshape(pivot.shape());
                     gap.mutable_share(1)->reshape(pivot.shape());
                     std::vector<int64_t> gap_data_0;
                     std::vector<int64_t> gap_data_1;
-                    std::copy(seqs[j]->mutable_share(0)->data(), 
-                              seqs[j]->mutable_share(0)->data() + seqs[j]->shape()[0],
+                    std::copy(mutable_seqs[j]->mutable_share(0)->data(), 
+                              mutable_seqs[j]->mutable_share(0)->data() + mutable_seqs[j]->shape()[0],
                               gap_data_0.begin());
-                    std::copy(seqs[j]->mutable_share(1)->data(), 
-                              seqs[j]->mutable_share(1)->data() + seqs[j]->shape()[0],
+                    std::copy(mutable_seqs[j]->mutable_share(1)->data(), 
+                              mutable_seqs[j]->mutable_share(1)->data() + mutable_seqs[j]->shape()[0],
                               gap_data_1.begin());
                     for (size_t l_idx = 0; l_idx < l.size(); ++l_idx) {
                         size_t insert_idx = l[l.size() - 1 - l_idx];
@@ -2265,10 +2284,10 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
                     }
                     std::copy(gap_data_0.begin(), gap_data_0.end(), gap.mutable_share(0)->data());
                     std::copy(gap_data_1.begin(), gap_data_1.end(), gap.mutable_share(1)->data());
-                    seqs[j]->mutable_share(0)->reshape(pivot.shape());
-                    seqs[j]->mutable_share(1)->reshape(pivot.shape());
-                    gap.share(0)->copy(seqs[j]->mutable_share(0));
-                    gap.share(1)->copy(seqs[j]->mutable_share(1));
+                    mutable_seqs[j]->mutable_share(0)->reshape(pivot.shape());
+                    mutable_seqs[j]->mutable_share(1)->reshape(pivot.shape());
+                    gap.share(0)->copy(mutable_seqs[j]->mutable_share(0));
+                    gap.share(1)->copy(mutable_seqs[j]->mutable_share(1));
                 }
             }
         }
@@ -2277,8 +2296,8 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
     ret->mutable_share(0)->reshape(result_shape);
     ret->mutable_share(1)->reshape(result_shape);
     for (size_t i = 0; i < seqs_len; ++i) {
-        seqs[i]->share(0)->copy(ret->mutable_share(0)->operator[](i).get());
-        seqs[i]->share(1)->copy(ret->mutable_share(1)->operator[](i).get());
+        mutable_seqs[i]->share(0)->copy(ret->mutable_share(0)->operator[](i).get());
+        mutable_seqs[i]->share(1)->copy(ret->mutable_share(1)->operator[](i).get());
     }
 }
 

@@ -33,8 +33,7 @@ public:
 
         int64_t max_len = *(std::max_element(lod->data<int64_t>(), lod->data<int64_t>() + size));
 
-        std::vector<int64_t> output_dims{2, size, max_len};
-
+        std::vector<int64_t> output_dims{2, size, 2 * max_len};
         out->mutable_data<T>(framework::make_ddim(output_dims), ctx.GetPlace());
 
         mpc::MpcInstance::mpc_instance()->mpc_protocol()->mpc_operators()->align_star(
