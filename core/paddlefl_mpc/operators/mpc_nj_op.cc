@@ -13,60 +13,53 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "paddle/fluid/framework/op_registry.h"
-#include "mpc_p_distance_op.h"
+#include "mpc_nj_op.h"
 
 namespace paddle {
 namespace operators {
 
 using Tensor = framework::Tensor;
 
-class MpcPDistance : public framework::OperatorWithKernel {
+class MpcNJ : public framework::OperatorWithKernel {
 public:
     using framework::OperatorWithKernel::OperatorWithKernel;
 
     void InferShape(framework::InferShapeContext* ctx) const override {
         PADDLE_ENFORCE_EQ(
             ctx->HasInput("X"), true,
-            platform::errors::NotFound("Input(X) of Mpc PDistance should not be null."));
-        PADDLE_ENFORCE_EQ(
-            ctx->HasInput("Miss"), true,
-            platform::errors::NotFound("Input(Miss) of MpcPDistance should not be null."));
+            platform::errors::NotFound("Input(X) of Mpc NJ should not be null."));
         PADDLE_ENFORCE_EQ(
             ctx->HasOutput("Out"), true,
-            platform::errors::NotFound("Output(Out) of MpcPDistance should not be null."));
-
+            platform::errors::NotFound("Output(Out) of Mpc NJ should not be null."));
+        
+        std::vector<std::string> ids = ctx->Attrs().Get<std::vector<std::string>>("ids");
         auto x_dims = ctx->GetInputDim("X");
-
-        VLOG(3) << "mpc pdistance operator x.shape=" << x_dims ;
-
-        std::vector<int64_t> output_dims{2, x_dims[1], x_dims[1]};
-
-        ctx->SetOutputDim("Out", framework::make_ddim(output_dims));
+        
+        VLOG(3) << "mpc NJ operator x.shape=" << x_dims;
+        
         ctx->ShareLoD("X", /*->*/ "Out");
     }
-
     framework::OpKernelType GetExpectedKernelType(
         const framework::ExecutionContext& ctx) const override {
             return framework::OpKernelType(
                 OperatorWithKernel::IndicateVarDataType(ctx, "X"), ctx.GetPlace());
     }
-                
 };
 
-class MpcPDistanceMaker : public framework::OpProtoAndCheckerMaker {
+class MpcNJMaker : public framework::OpProtoAndCheckerMaker {
 public:
     void Make() override {
-        AddInput("X", "(Tensor), The first input tensor of mpc PDistance op.");
-        AddInput("Miss", "(Tensor), The second input tensor of mpc PDistance op.");
-        AddOutput("Out", "(Tensor), The output tensor of mpc PDistance op.");
-        
+        AddInput("X", "(Tensor), The first input tensor of mpc NJ op.");
+        AddOutput("Out", "(Tensor), The output tensor of mpc NJ op.");
+        AddAttr<std::vector<std::string>>("ids",
+            "(vector<string>) The ids of input tensor");
         AddComment(R"DOC(
-MPC PDistance Operator.
+MPC NJ Operator.
 )DOC");
     }
 };
 
-class MpcPDistanceInferVarType : public framework::PassInDtypeAndVarTypeToOutput {
+class MpcNJInferVarType : public framework::PassInDtypeAndVarTypeToOutput {
 protected:
     std::unordered_map<std::string, std::string>& GetInputOutputWithSameType()
             const override {
@@ -79,10 +72,10 @@ protected:
 } // namespace paddle
 
 namespace ops = paddle::operators;
-REGISTER_OPERATOR(mpc_p_distance, ops::MpcPDistance,
-                 ops::MpcPDistanceMaker,
-                 ops::MpcPDistanceInferVarType);
+REGISTER_OPERATOR(mpc_nj, ops::MpcNJ,
+                 ops::MpcNJMaker,
+                 ops::MpcNJInferVarType);
 
 REGISTER_OP_CPU_KERNEL(
-    mpc_p_distance,
-    ops::MpcPDistanceKernel<paddle::platform::CPUDeviceContext, int64_t>);
+    mpc_nj,
+    ops::MpcNJKernel<paddle::platform::CPUDeviceContext, int64_t>);

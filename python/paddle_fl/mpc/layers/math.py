@@ -29,7 +29,8 @@ __all__ = [
     'reduce_sum',
     'scale',
     'p_distance',
-    'align_star'
+    'align_star',
+    'nj'
 ]
 
 
@@ -279,4 +280,20 @@ def align_star(x, lod):
                 'Lod': [lod]},
         outputs={'Out': [out]})
 
+    return out
+
+
+def nj(x, ids):
+    """R
+    
+    """
+    check_mpc_variable_and_dtype(x, "x", ['int64'], "nj")
+    helper = MpcLayerHelper('nj', **locals())
+    out = helper.create_variable_for_type_inference(dtype='uint8')
+    helper.append_op(
+        type='mpc_nj',
+        inputs={'X': [x]},
+        outputs={'Out': [out]},
+        attrs = {"ids": ids})
+        
     return out

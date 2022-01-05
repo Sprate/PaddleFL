@@ -650,5 +650,20 @@ void Aby3OperatorsImpl::align_star(const Tensor* seqs, const Tensor* lod, Tensor
 
 }
 
+void Aby3OperatorsImpl::nj(
+        const Tensor *dm,
+        const std::vector<std::string> &ids,
+        Tensor *out) {
+    auto lhs_tuple = from_tensor(dm);
+    auto lhs_ = std::get<0>(lhs_tuple).get();
+    std::string tree = "";
+    FixedTensor::nj(lhs_, ids, tree);
+    out->Resize(paddle::framework::make_ddim({int64_t(tree.length())}));
+    const uint8_t *tree_encode =
+        reinterpret_cast<const uint8_t*>(tree.data());
+    std::copy(tree_encode, tree_encode + tree.length(),
+              out->data<uint8_t>());
+}
+
 } // mpc
 } // paddle

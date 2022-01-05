@@ -43,8 +43,7 @@ public:
         
         VLOG(3) << "mpc pdistance operator x.shape=" << x_dims;
         
-        //ctx->SetOutputDim("Out", framework::make_ddim(output_dims));
-        //ctx->ShareLoD("X", /*->*/ "Out");
+        ctx->ShareLoD("X", /*->*/ "Out");
     }
 };
 

@@ -121,6 +121,8 @@ public:
 
     void align_star(const Tensor* seqs, const Tensor* lod, Tensor *out);
 
+    void nj(const Tensor* dm, const std::vector<std::string> &ids, Tensor *out);
+
 private:
 
     typedef void(FixedTensor:: * sigmoid_func)(FixedTensor *fixed_tensor);

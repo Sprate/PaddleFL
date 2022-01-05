@@ -25,7 +25,7 @@ namespace mpc {
 using paddle::framework::Tensor;
 
 // TODO: decide scaling factor
-const size_t FIXED_POINTER_SCALING_FACTOR = 16;
+const size_t FIXED_POINTER_SCALING_FACTOR = 28;
 
 class MpcOperators {
 public:
@@ -172,6 +172,8 @@ public:
     virtual void calc_multi_p_distance(const Tensor *lhs, const Tensor *miss, Tensor *out) {};
 
     virtual void align_star(const Tensor* seqs, const Tensor* lod, Tensor *out) {};
+
+    virtual void nj(const Tensor* dm, const std::vector<std::string> &ids, Tensor *out) {};
 };
 
 } // mpc

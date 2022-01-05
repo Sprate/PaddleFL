@@ -3966,16 +3966,14 @@ TEST_F(FixedTensorTest, calc_multi_p_distance) {
 
     std::vector<size_t> shape = {5, 8};
     std::vector<size_t> shape_ = {8};
-    std::vector<size_t> shape_miss = {3, 6};
+    std::vector<size_t> shape_miss = {3};
     std::vector<size_t> shape_o = {5, 5};
     std::vector<std::vector<double>> in0_val = { {1, 5, 3, 1, 3, 1, 6, 5},
                                                  {1, 3, 3, 1, 3, 1, 3, 5},
                                                  {6, 3, 3, 1, 3, 6, 3, 6},
                                                  {1, 3, 3, 6, 3, 1, 3, 5},
                                                  {1, 6, 3, 6, 5, 1, 6, 2}};
-    std::vector<std::vector<double>> miss = { {0, 0, 0, 0, 0, 0, 0, 0}, 
-                                              {4, 4, 4, 4, 4, 4, 4, 4},
-                                              {7, 7, 7, 7, 7, 7, 7, 7} };
+    std::vector<double> miss = {0, 4, 7};
 
     std::vector<std::vector<double>> res_val = { {0., 0.25, 0.625, 0.375, 0.5},
                                                  {0.25, 0., 0.375, 0.125, 0.625},
@@ -3992,11 +3990,8 @@ TEST_F(FixedTensorTest, calc_multi_p_distance) {
     
     std::shared_ptr<TensorAdapter<int64_t>> temp = gen(shape_);
 
-    for (size_t i = 0; i < 3; ++i) {
-        in[1]->slice(i, i + 1, temp.get());
-        test_fixedt_gen_paddle_tensor<int64_t, 16>(miss[i],
-                                shape, _cpu_ctx).copy(temp.get());
-    }
+    test_fixedt_gen_paddle_tensor<int64_t, 16>(miss, 
+                                shape_miss, _cpu_ctx).copy(in[1].get());
 
     dynamic_cast<PaddleTensor<int64_t>*>(in[1].get())->
                                 scaling_factor() = 16;
@@ -4049,7 +4044,7 @@ TEST_F(FixedTensorTest, align_nw_two) {
     std::vector<size_t> shape_aligned = {2, 8};
     std::vector<double> in1_val = {1, 5, 3, 1, 3, 1, 5};
     std::vector<double> in2_val = {1, 3, 3, 1, 3, 1, 3, 5};
-    std::vector<std::vector<double>> aligned = { {1, 5, 3, 1, 3, 1, 6, 5},
+    std::vector<std::vector<double>> aligned = { {1, 5, 3, 1, 3, 1, 95, 5},
                                                  {1, 3, 3, 1, 3, 1, 3, 5}};
 
     std::vector<std::vector<double>> res_val = { {0., -3., -6., -9., -12., -15., -18., -21., -24.},
@@ -4159,11 +4154,11 @@ TEST_F(FixedTensorTest, align_star_multiple) {
                                               {1, 3, 3, 3, 1, 3, 5},
                                               {1, 3, 5, 1, 2}};
 
-    std::vector<std::vector<double>> res_val = { {1, 5, 3, 1, 3, 1, 6, 5},
+    std::vector<std::vector<double>> res_val = { {1, 5, 3, 1, 3, 1, 95, 5},
                                                  {1, 3, 3, 1, 3, 1, 3, 5},
-                                                 {6, 3, 3, 1, 3, 6, 3, 6},
-                                                 {1, 3, 3, 6, 3, 1, 3, 5},
-                                                 {1, 6, 3, 6, 5, 1, 6, 2}};
+                                                 {95, 3, 3, 1, 3, 95, 3, 95},
+                                                 {1, 3, 3, 95, 3, 1, 3, 5},
+                                                 {1, 95, 3, 95, 5, 1, 95, 2}};
     
     std::vector<std::shared_ptr<TensorAdapter<int64_t>>> in =
                      {gen(shape_in[0]), gen(shape_in[1]), gen(shape_in[2]),
@@ -4227,7 +4222,7 @@ TEST_F(FixedTensorTest, nj) {
                                 shape_, _cpu_ctx).copy(in[0]->operator[](i).get());
     }
     std::vector<std::string> ids = {"a" , "b", "c" , "d", "e"};
-    std::string expect_tree = "((e, a), (c, b), d)";
+    std::string expect_tree = "((e, a), (c, b), d);";
     std::string tree0 = "";
     std::string tree1 = "";
     std::string tree2 = "";

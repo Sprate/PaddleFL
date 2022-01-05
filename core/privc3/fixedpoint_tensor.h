@@ -271,11 +271,16 @@ public:
                              FixedPointTensor* paths,
                              std::vector<std::shared_ptr<FixedPointTensor<T, N>>> &aligned,
                              std::vector<size_t> &l);
+    
+    static void align_nw_two_socre(const FixedPointTensor* lhs,
+                                   const FixedPointTensor* rhs,
+                                   FixedPointTensor* ret,
+                                   FixedPointTensor* score_bottom_right);
 
     static void align_star_multiple(std::vector<std::shared_ptr<FixedPointTensor<T, N>>> &seqs,
                                     FixedPointTensor* ret);
     
-    static void nj(FixedPointTensor* dm, std::vector<std::string> &ids,
+    static void nj(const FixedPointTensor* dm, const std::vector<std::string> &ids,
                    std::string & tree);
     
 private:
