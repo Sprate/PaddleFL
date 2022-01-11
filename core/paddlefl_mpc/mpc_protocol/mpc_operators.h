@@ -25,7 +25,7 @@ namespace mpc {
 using paddle::framework::Tensor;
 
 // TODO: decide scaling factor
-const size_t FIXED_POINTER_SCALING_FACTOR = 28;
+const size_t FIXED_POINTER_SCALING_FACTOR = 24;
 
 class MpcOperators {
 public:

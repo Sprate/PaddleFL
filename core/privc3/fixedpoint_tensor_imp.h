@@ -1814,39 +1814,65 @@ void FixedPointTensor<T, N>::calc_p_distance(const FixedPointTensor* lhs,
                                              const TensorAdapter<T>* miss,
                                              FixedPointTensor* ret) {
     
-    size_t len = lhs->shape()[0];
+    size_t len = lhs->shape()[1];
     auto shape = lhs->shape();
     auto miss_len = miss->shape()[0];
+    std::vector<size_t> shape_one = {1};
+    std::vector<size_t> distance_shape = {len};
     std::vector<std::shared_ptr<TensorAdapter<T>>> temp;
     for (size_t i = 0; i < 8; ++i) {
         temp.emplace_back(
             tensor_factory()->template create<T>(lhs->shape()));
     }
-    BooleanTensor<T> cmp_result(temp[0].get(), temp[1].get());
-    BooleanTensor<T> cmp0(temp[2].get(), temp[3].get());
-
-    lhs->neq(rhs, &cmp0);
-    cmp0.share(0)->copy(cmp_result.share(0));
-    cmp0.share(1)->copy(cmp_result.share(1));
+    for (size_t i = 8; i < 12; ++i) {
+        temp.emplace_back(
+            tensor_factory()->template create<T>());
+    }
+    FixedPointTensor<T, N> cmp_result(temp[0].get(), temp[1].get());
+    FixedPointTensor<T, N> cmp0(temp[2].get(), temp[3].get());
+    BooleanTensor<T> cmp_bool(temp[4].get(), temp[5].get());
+    lhs->sub(rhs, &cmp0);
+    cmp0.share(0)->copy(cmp_result.mutable_share(0));
+    cmp0.share(1)->copy(cmp_result.mutable_share(1));
     
     auto _nN = tensor_factory()->template create<T>();
+    _nN->scaling_factor() = N;
     for (size_t idx = 0; idx < miss_len; ++idx) {
         miss->slice(idx, idx + 1, _nN.get());
         _nN->reshape(shape);
-        lhs->neq(_nN.get(), &cmp0);
-        cmp_result.bitwise_and(&cmp0, &cmp_result);
-        rhs->neq(_nN.get(), &cmp0);
-        cmp_result.bitwise_and(&cmp0, &cmp_result);
+        lhs->sub(_nN.get(), &cmp0);
+        cmp_result.mul(&cmp0, &cmp_result);
+        rhs->sub(_nN.get(), &cmp0);
+        cmp_result.mul(&cmp0, &cmp_result);
     }
+    auto zero_tensor = tensor_factory()->template create<T>(lhs->shape());
+    zero_tensor->scaling_factor() = N;
+    assign_to_tensor(zero_tensor.get(), T(0));
+    cmp_result.neq(zero_tensor.get(), &cmp_bool);
     
     FixedPointTensor<T, N> distance(temp[6].get(), temp[7].get());
-    cmp_result.lshift(N, &cmp_result);
-    cmp_result.b2a(&distance);
+    FixedPointTensor<T, N> temp_distance(temp[8].get(), temp[9].get());
+    FixedPointTensor<T, N> temp_sum(temp[10].get(), temp[11].get());
+    temp_sum.mutable_share(0)->reshape(shape_one);
+    temp_sum.mutable_share(1)->reshape(shape_one);
+    
+    cmp_bool.lshift(N, &cmp_bool);
+    cmp_bool.b2a(&distance);
     
     auto scale = tensor_factory()->template create<T>(ret->shape());
     scale->scaling_factor() = N;
     assign_to_tensor(scale.get(), T(len * (T(1) << N)));
-    distance.sum(ret);
+    
+    for (size_t i = 0; i < distance.shape()[0]; ++i) {
+        distance.share(0)->slice(i, i + 1, temp_distance.mutable_share(0));
+        temp_distance.mutable_share(0)->reshape(distance_shape);
+        distance.share(1)->slice(i, i + 1, temp_distance.mutable_share(1));
+        temp_distance.mutable_share(1)->reshape(distance_shape);
+        temp_distance.sum(&temp_sum);
+        ret->mutable_share(0)->data()[i] = temp_sum.share(0)->data()[0];
+        ret->mutable_share(1)->data()[i] = temp_sum.share(1)->data()[0];
+    }
+    //distance.sum(ret);
     ret->div(scale.get(), ret);
 }
 
@@ -1857,19 +1883,19 @@ void FixedPointTensor<T, N>::calc_multi_p_distance(const FixedPointTensor* lhs,
     
     auto shape = ret->shape();
     auto shape_ = lhs->shape();
-    shape_.erase(shape_.begin());
-    std::vector<size_t> shape_one = {1};
+    //shape_.erase(shape_.begin());
+    std::vector<size_t> shape_one_ret = {shape_[0]};
     std::vector<std::shared_ptr<TensorAdapter<T>>> temp;
     for (size_t i = 0; i < 7; ++i) {
         temp.emplace_back(
             tensor_factory()->template create<T>());
     }
     
-    temp[4]->reshape(shape_one);
-    temp[5]->reshape(shape_one);
+    temp[4]->reshape(shape_one_ret);
+    temp[5]->reshape(shape_one_ret);
     FixedPointTensor<T, N> temp_ret(temp[4].get(), temp[5].get());
     
-    std::vector<size_t> shape_miss = {miss->shape()[0], shape_[1]};
+    std::vector<size_t> shape_miss = {miss->shape()[0], lhs->shape()[0], lhs->shape()[1]};
     auto miss_ = tensor_factory()->template create<T>(shape_miss);
     miss_->scaling_factor() = N;
     for (size_t i = 0; i < miss->shape()[0]; ++i) {
@@ -1877,26 +1903,21 @@ void FixedPointTensor<T, N>::calc_multi_p_distance(const FixedPointTensor* lhs,
         assign_to_tensor(temp[6].get(), T(miss->data()[i]));
     }
 
-    size_t index = 0;
     for (size_t i = 0; i < shape[0]; ++i) {
         lhs->share(0)->slice(i, i + 1, temp[0].get());
         lhs->share(1)->slice(i, i + 1, temp[1].get());
 
-        temp[0]->reshape(shape_);
-        temp[1]->reshape(shape_);
-        FixedPointTensor<T, N> temp_l(temp[0].get(), temp[1].get());
-        for (size_t j = 0; j < shape[0]; ++j) {
-            lhs->share(0)->slice(j, j + 1, temp[2].get());
-            lhs->share(1)->slice(j, j + 1, temp[3].get());
-            temp[2]->reshape(shape_);
-            temp[3]->reshape(shape_);
-            FixedPointTensor<T, N> temp_r(temp[2].get(), temp[3].get());
-            calc_p_distance(&temp_l, &temp_r, miss_.get(), &temp_ret);
-
-            ret->mutable_share(0)->data()[index] = temp_ret.mutable_share(0)->data()[0];
-            ret->mutable_share(1)->data()[index] = temp_ret.mutable_share(1)->data()[0];
-            index++;
-        }  
+        temp[2]->reshape(shape_);
+        temp[3]->reshape(shape_);
+        FixedPointTensor<T, N> temp_l(temp[2].get(), temp[3].get());
+        for(size_t idx = 0; idx < shape_[0]; ++idx) {
+            temp[0]->copy(temp_l.mutable_share(0)->operator[](idx).get());
+            temp[1]->copy(temp_l.mutable_share(1)->operator[](idx).get());
+        }
+        calc_p_distance(&temp_l, lhs, miss_.get(), &temp_ret);
+        temp_ret.share(0)->copy(ret->mutable_share(0)->operator[](i).get());
+        temp_ret.share(1)->copy(ret->mutable_share(1)->operator[](i).get());
+        std::cout << "distance " << i << std::endl;
     }
 }
 
@@ -2211,6 +2232,7 @@ void FixedPointTensor<T, N>::align_nw_two_socre(const FixedPointTensor* lhs,
 
             ret->mutable_share(0)->data()[ i * (n2 + 1) + j] = score.share(0)->data()[0];
             ret->mutable_share(1)->data()[ i * (n2 + 1) + j] = score.share(1)->data()[0];
+            //std::cout << i * (n2 + 1) + j << std::endl;
         }
     }
     score_bottom_right->mutable_share(0)->data()[0] = ret->share(0)->data()[n1 * (n2 + 1) + n2];
@@ -2269,6 +2291,7 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
     temp[8]->reshape(shape_scores2a2);
     temp[9]->reshape(shape_scores2a2);
     FixedPointTensor<T, N> scores2a2(temp[8].get(), temp[9].get());
+    std::cout << "time 0" << std::endl;
     for (size_t i = 0; i < pairs_len; ++i) {
         size_t lhs_idx = pairs[i].first;
         size_t rhs_idx = pairs[i].second;
@@ -2287,7 +2310,7 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
         scores2a2.mutable_share(0)->data()[i] = score_bottom_right.share(0)->data()[0];
         scores2a2.mutable_share(1)->data()[i] = score_bottom_right.share(1)->data()[0];
     }
-    
+    std::cout << "time 1" << std::endl;
     std::vector<size_t> shape_seqs = {seqs_len, 1};
     std::vector<size_t> shape_global_scores_temp = {seqs_len - 1};
     temp[10]->reshape(shape_seqs);
@@ -2322,11 +2345,11 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
     temp[14]->reshape(shape_pooling);
     temp[15]->reshape(shape_pooling);
     BooleanTensor<T> max_idx_one_hot(temp[14].get(), temp[15].get());
-
+    std::cout << "time 2" << std::endl;
     score_bottom_right.mutable_share(0)->reshape(shape_one_one);
     score_bottom_right.mutable_share(1)->reshape(shape_one_one);
     global_scores.max_pooling(&score_bottom_right, &max_idx_one_hot);
-
+    std::cout << "time 3" << std::endl;
     auto max_tensor = tensor_factory()->template create<T>(shape_pooling);
     max_idx_one_hot.reveal(max_tensor.get());
     size_t max_idx = 0;
@@ -2365,6 +2388,7 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
         std::vector<size_t> l;
         align_nw_two(mutable_seqs[i].get(), &pivot, &score_matrix, &score_bottom_right,
                     &paths, aligned, l);
+        //std::cout << "align_nw_two " << i << std::endl;
         mutable_seqs[i]->mutable_share(0)->reshape(aligned[0]->shape());
         aligned[0]->share(0)->copy(mutable_seqs[i]->mutable_share(0));
         mutable_seqs[i]->mutable_share(1)->reshape(aligned[0]->shape());
@@ -2405,6 +2429,7 @@ void FixedPointTensor<T, N>::align_star_multiple(std::vector<std::shared_ptr<Fix
             }
         }
     }
+    std::cout << "time 4" << std::endl;
     std::vector<size_t> result_shape = {seqs_len, pivot.shape()[0]};
     ret->mutable_share(0)->reshape(result_shape);
     ret->mutable_share(1)->reshape(result_shape);
@@ -2419,7 +2444,7 @@ void FixedPointTensor<T, N>::nj(const FixedPointTensor* dm, const std::vector<st
                                 std::string & tree) {
     PADDLE_ENFORCE_GE(dm->shape()[0], 3,
                       "Distance matrix must be at least 3x3 ");
-
+    
     auto dm0 = tensor_factory()->template create<T>(dm->shape());
     auto dm1 = tensor_factory()->template create<T>(dm->shape());
     std::shared_ptr<FixedPointTensor<T, N> > mutable_dm =
@@ -2460,6 +2485,7 @@ void FixedPointTensor<T, N>::nj(const FixedPointTensor* dm, const std::vector<st
     //dm[i, k] + dm[j, k] - dm[i, j]
     FixedPointTensor dm_i_k(temp[16].get(), temp[17].get());
     FixedPointTensor k_to_u(temp[18].get(), temp[19].get());
+    FixedPointTensor temp_pooling(temp[20].get(), temp[21].get());
     
     //0  0.5
     auto zero_tensor = tensor_factory()->template create<T>(shape_one);
@@ -2475,6 +2501,7 @@ void FixedPointTensor<T, N>::nj(const FixedPointTensor* dm, const std::vector<st
     
     while(mutable_dm->shape()[0] > 3) {
         //q = _compute_q(dm)
+        std::cout << " nj " << mutable_dm->shape()[0] << std::endl;
         std::vector<size_t> shape_sum = {mutable_dm->shape()[0]};
         q.mutable_share(0)->reshape(mutable_dm->shape());
         q.mutable_share(1)->reshape(mutable_dm->shape());
@@ -2535,10 +2562,15 @@ void FixedPointTensor<T, N>::nj(const FixedPointTensor* dm, const std::vector<st
         */
 
         q.negative(&q);
-        
         //idx1, idx2 = _lowest_index(q)
+
         size_t cmp_size = len * (len - 1) / 2; 
-        std::vector<size_t> shape_cmp_pooling = {cmp_size, 1};
+        size_t cmp_row = (len % 2)? (len - 1) / 2 : len / 2 ;
+        size_t cmp_col = cmp_size / cmp_row ;
+        std::vector<size_t> shape_cmp_pooling = {cmp_row, cmp_col};
+        std::vector<size_t> shape_pooling_result_0 = {1, cmp_col};
+        std::vector<size_t> shape_pooling_result_1 = {cmp_col, 1};
+        std::vector<size_t> shape_pooling_result_2 = {cmp_row, 1};
         cmp_pooling.share(0)->reshape(shape_cmp_pooling);
         cmp_pooling.share(1)->reshape(shape_cmp_pooling);
 
@@ -2548,28 +2580,59 @@ void FixedPointTensor<T, N>::nj(const FixedPointTensor* dm, const std::vector<st
         size_t count = 0;
         for (size_t i = 1; i < len; ++i) {
             for (size_t j = 0; j < i; ++j) {
-                temp_sum_tensor.mutable_share(0)->data()[count] =
+
+                temp_sum_tensor.mutable_share(0)->data()[(count % cmp_row) * cmp_col + count / cmp_row] =
                                 q.share(0)->data()[i * len + j];
-                temp_sum_tensor.mutable_share(1)->data()[count] =
+                temp_sum_tensor.mutable_share(1)->data()[(count % cmp_row) * cmp_col + count / cmp_row] =
                                 q.share(1)->data()[i * len + j];
+                
                 lowest_index[count++] = std::make_pair(i, j);
+ 
             }
         }
-        temp_sum_result.mutable_share(0)->reshape(shape_one_one);
-        temp_sum_result.mutable_share(1)->reshape(shape_one_one);
+
+        temp_sum_result.mutable_share(0)->reshape(shape_pooling_result_0);
+        temp_sum_result.mutable_share(1)->reshape(shape_pooling_result_0);
         temp_sum_tensor.max_pooling(&temp_sum_result, &cmp_pooling);
 
-        bool_reveal_tensor->reshape(cmp_pooling.shape());
-        cmp_pooling.reveal(bool_reveal_tensor.get());
-        size_t idx1 = 0;
-        size_t idx2 = 0;
+        temp_sum_result.mutable_share(0)->reshape(shape_pooling_result_1);
+        temp_sum_result.mutable_share(1)->reshape(shape_pooling_result_1);
+        temp_pooling.mutable_share(0)->reshape(shape_one_one);
+        temp_pooling.mutable_share(1)->reshape(shape_one_one);
 
-        for (size_t i = 0; i < cmp_size; ++i) {
-            if (bool_reveal_tensor->data()[i] == 1) {
-                idx1 = lowest_index[i].first;
-                idx2 = lowest_index[i].second;
+        cmp.share(0)->reshape(shape_pooling_result_1);
+        cmp.share(1)->reshape(shape_pooling_result_1);
+        temp_sum_result.max_pooling(&temp_pooling, &cmp);
+
+        //std::cout << "max pooling end" << std::endl;
+
+        bool_reveal_tensor->reshape(cmp.shape());
+        cmp.reveal(bool_reveal_tensor.get());
+        
+        size_t index_row = 0;
+        size_t index_col = 0;
+        for (size_t i = 0; i < cmp_col ; ++i) {
+            if(bool_reveal_tensor->data()[i] == 1) {
+                index_col = i;
             }
         }
+        cmp.share(0)->reshape(shape_pooling_result_2);
+        cmp.share(1)->reshape(shape_pooling_result_2);
+        for (size_t i = 0; i < cmp_row; ++i) {
+            cmp.share(0)->data()[i] = cmp_pooling.share(0)->data()[ i * cmp_col + index_col];
+            cmp.share(1)->data()[i] = cmp_pooling.share(1)->data()[ i * cmp_col + index_col];
+        }
+        bool_reveal_tensor->reshape(cmp.shape());
+        cmp.reveal(bool_reveal_tensor.get());
+        for (size_t i = 0; i < cmp_row; ++i) {
+            if(bool_reveal_tensor->data()[i] == 1) {
+                index_row = i;
+            }
+        }
+        size_t idx = index_col * cmp_row + index_row;
+        size_t idx1 = lowest_index[idx].first;
+        size_t idx2 = lowest_index[idx].second;
+        
         //std::cout << "idx is " << idx1 << " " << idx2 << std::endl;
         auto pair_member_1 = mutable_ids[idx1];
         auto pair_member_2 = mutable_ids[idx2];
@@ -2589,6 +2652,7 @@ void FixedPointTensor<T, N>::nj(const FixedPointTensor* dm, const std::vector<st
         dm_temp.mutable_share(1)->reshape(shape_out);
         assign_to_tensor(dm_temp.mutable_share(0), (T)(0));
         assign_to_tensor(dm_temp.mutable_share(1), (T)(0));
+        //std::cout << " time1 " << std::endl;
         for (size_t i = 1; i < out_ids.size(); ++i) {
 
             size_t k = out_ids[i].first;
@@ -2634,7 +2698,7 @@ void FixedPointTensor<T, N>::nj(const FixedPointTensor* dm, const std::vector<st
         mutable_dm->mutable_share(1)->reshape(dm_temp.shape());
         dm_temp.share(0)->copy(mutable_dm->mutable_share(0));
         dm_temp.share(1)->copy(mutable_dm->mutable_share(1));
-        
+        //std::cout << " time2 " << std::endl;
         /*
         fixed_reveal_tensor->reshape(mutable_dm->shape());
         mutable_dm->reveal(fixed_reveal_tensor.get());
@@ -2657,7 +2721,7 @@ void FixedPointTensor<T, N>::nj(const FixedPointTensor* dm, const std::vector<st
     std::string pair_member_1 = mutable_ids[1];
     std::string pair_member_2 = mutable_ids[2];
     tree = "(" + pair_member_1 + ", " + node_definition + ", " + pair_member_2 + ");";
-    
+    std::cout << "total comm is " << aby3_ctx()->network()->bytes << std::endl;
 }
 
 } // namespace aby3

@@ -108,6 +108,8 @@ public:
 
   virtual void init() = 0;
 
+  size_t bytes = 0;
+
 };
 
 } // namespace mpc

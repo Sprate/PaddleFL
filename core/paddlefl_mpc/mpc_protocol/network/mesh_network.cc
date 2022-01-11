@@ -38,25 +38,26 @@ void MeshNetwork::init() {
 
   _rendezvous_ctx = std::move(context);
   _is_initialized = true;
+  bytes = 0;
 }
 
 void MeshNetwork::send(size_t party, const void *data, size_t size) {
   PADDLE_ENFORCE_NOT_NULL(data);
   PADDLE_ENFORCE(_is_initialized);
-
+  bytes += size;
   auto unbounded_buf =
       _rendezvous_ctx->createUnboundBuffer(const_cast<void *>(data), size);
   unbounded_buf->send(party, 0UL /*slot*/);
-  unbounded_buf->waitSend();
+  unbounded_buf->waitSend(std::chrono::milliseconds(30000000));
 }
 
 void MeshNetwork::recv(size_t party, void *data, size_t size) {
   PADDLE_ENFORCE_NOT_NULL(data);
   PADDLE_ENFORCE(_is_initialized);
-
+  bytes += size;
   auto unbounded_buf = _rendezvous_ctx->createUnboundBuffer(data, size);
   unbounded_buf->recv(party, 0UL /*slot*/);
-  unbounded_buf->waitRecv();
+  unbounded_buf->waitRecv(std::chrono::milliseconds(30000000));
 }
 
 } // mpc
